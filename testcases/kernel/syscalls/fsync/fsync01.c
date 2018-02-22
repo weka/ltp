@@ -77,7 +77,7 @@ static struct tst_test test = {
 	.test_all = verify_fsync,
 	.needs_tmpdir = 1,
 	.needs_root = 1,
-	.mount_device = 1,
+	// .mount_device = 1,
 	.mntpoint = "mntpoint",
-	.all_filesystems = 1,
+	// .all_filesystems = 1,
 };

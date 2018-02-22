@@ -108,7 +108,7 @@ static struct tst_test test = {
 	.needs_tmpdir = 1,
 	.needs_root = 1,
 	.mntpoint = "msync04",
-	.mount_device = 1,
-	.all_filesystems = 1,
+	// .mount_device = 1,
+	// .all_filesystems = 1,
 	.min_kver = "2.6.25",
 };

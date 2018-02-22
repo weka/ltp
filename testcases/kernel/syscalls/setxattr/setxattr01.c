@@ -182,8 +182,8 @@ static struct tst_test test = {
 	.test = verify_setxattr,
 	.tcnt = ARRAY_SIZE(tc),
 	.mntpoint = MNTPOINT,
-	.mount_device = 1,
-	.all_filesystems = 1,
+	// .mount_device = 1,
+	// .all_filesystems = 1,
 	.needs_tmpdir = 1,
 	.needs_root = 1,
 };
