@@ -146,10 +146,10 @@ static void cleanup(void)
 
 static struct tst_test test = {
 	.needs_root = 1,
-	.mount_device = 1,
+	//.mount_device = 1,
 	.dev_min_size = 512,
 	.mntpoint = MNTPOINT,
-	.all_filesystems = 1,
+	//.all_filesystems = 1,
 	.setup = setup,
 	.cleanup = cleanup,
 	.test_all = run,
