@@ -46,7 +46,7 @@ FILE *fp_frag2;			/* File pointer for fragmented file 2 */
 int main(int argc, char *argv[])
 {
 	int bytes_read = 0, bytes_written = 0, fd1 = -1, fd2 = -1;
-	char buff[1024], frag_file1[100], frag_file2[100];
+	char buff[1024], frag_file1[255], frag_file2[255];
 
 	if (argc != 3) {
 		printf("Needs to pass two arguments..\n");
