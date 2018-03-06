@@ -25,6 +25,7 @@ top_srcdir			?= ../../../..
 include $(top_srcdir)/include/mk/testcases.mk
 
 FILTER_OUT_MAKE_TARGETS		:= libftest
+CFLAGS				+= -DNDEBUG
 
 include $(top_srcdir)/include/mk/generic_leaf_target.mk
 
