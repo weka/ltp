@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (c) 2016 Oracle and/or its affiliates. All Rights Reserved.
+# Copyright (c) 2016-2017 Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -42,11 +42,12 @@ fi
 tst_resm TINFO "the same VNI must work"
 # VNI is 24 bits long, so max value, which is not reserved, is 0xFFFFFE
 vxlan_setup_subnet_$vxlan_dst_addr "id 0xFFFFFE" "id 0xFFFFFE"
-virt_compare_netperf
+virt_netperf_msg_sizes
 virt_cleanup_rmt
 
 tst_resm TINFO "different VNI shall not work together"
 vxlan_setup_subnet_$vxlan_dst_addr "id 0xFFFFFE" "id 0xFFFFFD"
+virt_minimize_timeout
 virt_compare_netperf "fail"
 
 tst_exit
