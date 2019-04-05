@@ -54,6 +54,7 @@ AC_CHECK_HEADERS([ \
 
 AC_CHECK_FUNCS([ \
     profil \
+    stime \
     ustat \
 ])
 
