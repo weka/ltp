@@ -54,6 +54,14 @@ AC_CHECK_HEADERS([ \
 
 AC_CHECK_FUNCS([ \
     profil \
+    pwritev \
+    pwritev2 \
+    readlinkat \
+    renameat \
+    renameat2 \
+    sched_getcpu \
+    sigpending \
+    splice \
     stime \
     ustat \
 ])

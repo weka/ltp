@@ -59,7 +59,13 @@
 #include <errno.h>
 #include "test.h"
 #include <sys/types.h>
+#include "lapi/syscalls.h"
+#include "lapi/cpuset.h"
+#include "tst_test.h"
 #include <dirent.h>
+#include "config.h"
+
+
 
 #if defined(__i386__) || defined(__x86_64__)
 #if __GLIBC_PREREQ(2,6)
@@ -75,6 +81,19 @@ int sys_support = 0;
 #else
 int sys_support = 0;
 #endif
+
+
+static inline int get_cpu(unsigned *cpu_id,
+                          unsigned *node_id LTP_ATTRIBUTE_UNUSED,
+                          void *cache_struct LTP_ATTRIBUTE_UNUSED)
+{
+#ifndef HAVE_SCHED_GETCPU
+    return tst_syscall(__NR_getcpu, cpu_id, node_id, cache_struct);
+#else
+    *cpu_id = sched_getcpu();
+#endif
+    return 0;
+}
 
 #if !(__GLIBC_PREREQ(2, 7))
 #define CPU_FREE(ptr) free(ptr)
