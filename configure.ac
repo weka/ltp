@@ -53,6 +53,37 @@ AC_CHECK_HEADERS([ \
 ])
 
 AC_CHECK_FUNCS([ \
+    clone3 \
+    copy_file_range \
+    epoll_pwait \
+    execveat \
+    fallocate \
+    fchownat \
+    fsconfig \
+    fsmount \
+    fsopen \
+    fspick \
+    fstatat \
+    getdents \
+    getdents64 \
+    io_pgetevents \
+    io_uring_setup \
+    io_uring_register \
+    io_uring_enter \
+    kcmp \
+    mkdirat \
+    mknodat \
+    modify_ldt \
+    move_mount \
+    name_to_handle_at \
+    open_tree \
+    openat \
+    openat2 \
+    pidfd_open \
+    pidfd_send_signal \
+    pkey_mprotect \
+    preadv \
+    preadv2 \
     profil \
     pwritev \
     pwritev2 \
