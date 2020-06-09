@@ -321,9 +321,9 @@ static struct tst_test test = {
 	.setup = setup,
 	.test = run,
 	.tcnt = ARRAY_SIZE(tcases),
-	// .mount_device = 1,
+	.mount_device = 1,
 	.mntpoint = MNTPOINT,
-	// .all_filesystems = 1,
+	.all_filesystems = 1,
 	.needs_tmpdir = 1,
 	.needs_root = 1,
 };
