@@ -11,7 +11,6 @@
  * sem_timedwait call will immediately lock again.
  */
 
-#define _XOPEN_SOURCE 600
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -21,7 +20,6 @@
 #endif
 #include <semaphore.h>
 #include <stdio.h>
-#include <strings.h>
 #include <time.h>
 #include <unistd.h>
 #include "posixtest.h"

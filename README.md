@@ -22,6 +22,9 @@ http://lists.linux.it/listinfo/ltp
 The git repository is located at GitHub at:
 https://github.com/linux-test-project/ltp
 
+The patchwork instance is at:
+https://patchwork.ozlabs.org/project/ltp/list/
+
 Warning!
 ========
 
@@ -34,14 +37,60 @@ on properly functioning systems, they are intended to find (or cause) problems.
 Quick guide to running the tests
 ================================
 
-If you have git, autoconf, automake, m4, the linux headers and the common
-developer packages installed, the chances are the following will work.
+If you have git, autoconf, automake, m4, pkgconf / pkg-config, libc headers,
+linux kernel headers and other common development packages installed (see
+INSTALL and travis/*.sh), the chances are the following will work:
 
 ```
 $ git clone https://github.com/linux-test-project/ltp.git
 $ cd ltp
 $ make autotools
 $ ./configure
+```
+
+Now you can continue either with compiling and running a single test or with
+compiling and installing the whole testsuite.
+
+For optional library dependencies look into scripts for major distros in
+`travis/` directory. You can also build whole LTP with `./build.sh` script.
+
+Shortcut to running a single test
+---------------------------------
+If you need to execute a single test you actually do not need to compile
+the whole LTP, if you want to run a syscall testcase following should work.
+
+```
+$ cd testcases/kernel/syscalls/foo
+$ make
+$ PATH=$PATH:$PWD ./foo01
+```
+
+Shell testcases are a bit more complicated since these need a path to a shell
+library as well as to compiled binary helpers, but generally following should
+work.
+
+```
+$ cd testcases/lib
+$ make
+$ cd ../commands/foo
+$ PATH=$PATH:$PWD:$PWD/../../lib/ ./foo01.sh
+```
+
+Open Posix Testsuite has it's own build system which needs Makefiles to be
+generated first, then compilation should work in subdirectories as well.
+
+```
+$ cd testcases/open_posix_testsuite/
+$ make generate-makefiles
+$ cd conformance/interfaces/foo
+$ make
+$ ./foo_1-1.run-test
+```
+
+Compiling and installing all testcases
+--------------------------------------
+
+```
 $ make
 $ make install
 ```
@@ -58,6 +107,9 @@ dependencies.
   output.
 * If a tests fails due to a missing user or group, see the Quick Start section
   of `INSTALL`.
+
+Running tests
+-------------
 
 To run all the test suites
 
@@ -120,6 +172,15 @@ Note that all shell scripts need the `PATH` to be set. However this is not
 limited to shell scripts, many C based tests need environment variables as
 well.
 
+For more info see `doc/user-guide.txt` or online at
+https://github.com/linux-test-project/ltp/wiki/User-Guidelines.
+
+Network tests
+-------------
+Network tests require certain setup, described in `testcases/network/README.md`
+(online at https://github.com/linux-test-project/ltp/tree/master/testcases/network)
+and `INSTALL`.
+
 Developers corner
 =================
 
@@ -127,6 +188,7 @@ Before you start you should read following documents:
 
 * `doc/test-writing-guidelines.txt`
 * `doc/build-system-guide.txt`
+* `doc/library-api-writing-guidelines.txt`
 
 There is also a step-by-step tutorial:
 
@@ -135,6 +197,15 @@ There is also a step-by-step tutorial:
 If something is not covered there don't hesitate to ask on the LTP mailing
 list. Also note that these documents are available online at:
 
-https://github.com/linux-test-project/ltp/wiki/Test-Writing-Guidelines
-https://github.com/linux-test-project/ltp/wiki/BuildSystem
-https://github.com/linux-test-project/ltp/wiki/C-Test-Case-Tutorial
+* https://github.com/linux-test-project/ltp/wiki/Test-Writing-Guidelines
+* https://github.com/linux-test-project/ltp/wiki/LTP-Library-API-Writing-Guidelines
+* https://github.com/linux-test-project/ltp/wiki/Build-System
+* https://github.com/linux-test-project/ltp/wiki/C-Test-Case-Tutorial
+
+Although we accept GitHub pull requests, the preferred way is sending patches to our mailing list.
+
+It's a good idea to test patches on Travis CI before posting to mailing
+list. Our travis setup covers various architectures and distributions in
+order to make sure LTP compiles cleanly on most common configurations.
+For testing you need to sign up to Travis CI, enable running builds on your LTP fork on
+https://travis-ci.org/account/repositories and push your branch.

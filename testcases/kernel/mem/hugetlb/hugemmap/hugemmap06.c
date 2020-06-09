@@ -1,18 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Copyright (c) 2015-2017 Red Hat, Inc.
  *
- * This program is free software;  you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY;  without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See
- * the GNU General Public License for more details.
- */
-
-/*
  * DESCRIPTION
  *
  *   There is a race condition if we map a same file on different processes.
@@ -22,10 +11,10 @@
  *   the region structure, so it can be modified by two processes concurrently.
  *
  *   This bug was fixed on stable kernel by commits:
- *       f522c3ac00(mm, hugetlb: change variable name reservations to resv)
- *       9119a41e90(mm, hugetlb: unify region structure handling)
- *       7b24d8616b(mm, hugetlb: fix race in region tracking)
- *       1406ec9ba6(mm, hugetlb: improve, cleanup resv_map parameters)
+ *       f522c3ac00a4(mm, hugetlb: change variable name reservations to resv)
+ *       9119a41e9091(mm, hugetlb: unify region structure handling)
+ *       7b24d8616be3(mm, hugetlb: fix race in region tracking)
+ *       1406ec9ba6c6(mm, hugetlb: improve, cleanup resv_map parameters)
  *
  * AUTHOR:
  *    Herton R. Krzesinski <herton@redhat.com>
@@ -39,7 +28,6 @@
 #include "lapi/mmap.h"
 
 static long hpage_size;
-static long hugepages;
 
 struct mp {
 	char *addr;
@@ -51,21 +39,9 @@ struct mp {
 
 static void setup(void)
 {
-	save_nr_hugepages();
-
-	hpage_size = SAFE_READ_MEMINFO("Hugepagesize:") * 1024;
-
-	hugepages = (ARSZ + 1) * LOOP;
-
-	if (hugepages * SAFE_READ_MEMINFO("Hugepagesize:") > SAFE_READ_MEMINFO("MemTotal:"))
+	if (tst_hugepages != test.request_hugepages)
 		tst_brk(TCONF, "System RAM is not enough to test.");
-
-	set_sys_tune("nr_hugepages", hugepages, 1);
-}
-
-static void cleanup(void)
-{
-	restore_nr_hugepages();
+	hpage_size = SAFE_READ_MEMINFO("Hugepagesize:") * 1024;
 }
 
 static void *thr(void *arg)
@@ -111,7 +87,7 @@ static void do_mmap(unsigned int j LTP_ATTRIBUTE_UNUSED)
 		mmap_sz[i].addr = addr;
 
 		TEST(pthread_create(&tid[i], NULL, thr, &mmap_sz[i]));
-		if (TEST_RETURN)
+		if (TST_RET)
 			tst_brk(TBROK | TRERRNO,
 					"pthread_create failed");
 
@@ -128,7 +104,7 @@ static void do_mmap(unsigned int j LTP_ATTRIBUTE_UNUSED)
 
 	for (i = 0; i < ARSZ; ++i) {
 		TEST(pthread_join(tid[i], NULL));
-		if (TEST_RETURN)
+		if (TST_RET)
 			tst_brk(TBROK | TRERRNO,
 					"pthread_join failed");
 	}
@@ -146,5 +122,12 @@ static struct tst_test test = {
 	.needs_tmpdir = 1,
 	.test = do_mmap,
 	.setup = setup,
-	.cleanup = cleanup,
+	.request_hugepages = (ARSZ + 1) * LOOP,
+	.tags = (const struct tst_tag[]) {
+		{"linux-git", "f522c3ac00a4"},
+		{"linux-git", "9119a41e9091"},
+		{"linux-git", "7b24d8616be3"},
+		{"linux-git", "1406ec9ba6c6"},
+		{}
+	}
 };

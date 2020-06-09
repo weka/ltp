@@ -1,19 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Copyright (C) 2017 Red Hat, Inc.
  *
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation; either version 2 of the License, or (at your option)
- * any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
 /*
@@ -59,7 +47,8 @@ static void test_msync(void)
 {
 	uint64_t dirty;
 
-	test_fd = SAFE_OPEN("msync04/testfile", O_CREAT | O_TRUNC | O_RDWR);
+	test_fd = SAFE_OPEN("msync04/testfile", O_CREAT | O_TRUNC | O_RDWR,
+		0644);
 	SAFE_WRITE(0, test_fd, STRING_TO_WRITE, sizeof(STRING_TO_WRITE) - 1);
 	mmaped_area = SAFE_MMAP(NULL, pagesize, PROT_READ | PROT_WRITE,
 			MAP_SHARED, test_fd, 0);
@@ -105,7 +94,6 @@ static struct tst_test test = {
 	.test_all = test_msync,
 	.setup = setup,
 	.cleanup = cleanup,
-	.needs_tmpdir = 1,
 	.needs_root = 1,
 	.mntpoint = "msync04",
 	.mount_device = 1,

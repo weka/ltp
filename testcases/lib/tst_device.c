@@ -1,19 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Copyright (c) 2017 Cyril Hrubis <chrubis@suse.cz>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it would be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write the Free Software Foundation,
- * Inc.,  51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 #include <errno.h>
@@ -31,8 +18,8 @@ static struct tst_test test = {
 
 static void print_help(void)
 {
-	printf("\nUsage: tst_device acquire [size]\n");
-	printf("   or: tst_device release /path/to/device\n\n");
+	fprintf(stderr, "\nUsage: tst_device acquire [size [filename]]\n");
+	fprintf(stderr, "   or: tst_device release /path/to/device\n\n");
 }
 
 static int acquire_device(int argc, char *argv[])
@@ -40,10 +27,10 @@ static int acquire_device(int argc, char *argv[])
 	unsigned int size = 0;
 	const char *device;
 
-	if (argc > 3)
+	if (argc > 4)
 		return 1;
 
-	if (argc == 3) {
+	if (argc >= 3) {
 		size = atoi(argv[2]);
 
 		if (!size) {
@@ -53,7 +40,11 @@ static int acquire_device(int argc, char *argv[])
 		}
 	}
 
-	device = tst_acquire_device__(size);
+	if (argc >= 4) {
+		device = tst_acquire_loop_device(size, argv[3]);
+	} else {
+		device = tst_acquire_device__(size);
+	}
 
 	if (!device)
 		return 1;
@@ -73,7 +64,13 @@ static int release_device(int argc, char *argv[])
 	if (argc != 3)
 		return 1;
 
-	return tst_release_device(argv[2]);
+	/*
+	 * tst_acquire_[loop_]device() was called in a different process.
+	 * tst_release_device() would think that no device was acquired yet
+	 * and do nothing. Call tst_detach_device() directly to bypass
+	 * the check.
+	 */
+	return tst_detach_device(argv[2]);
 }
 
 int main(int argc, char *argv[])

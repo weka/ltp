@@ -1,18 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Copyright (c) 2017 Cyril Hrubis <chrubis@suse.cz>
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #ifndef KEYCTL_H__
@@ -99,6 +87,10 @@ static inline key_serial_t keyctl_join_session_keyring(const char *name) {
 # define KEY_REQKEY_DEFL_THREAD_KEYRING 1
 #endif
 
+#ifndef KEY_REQKEY_DEFL_SESSION_KEYRING
+# define KEY_REQKEY_DEFL_SESSION_KEYRING 3
+#endif
+
 #ifndef KEY_REQKEY_DEFL_DEFAULT
 # define KEY_REQKEY_DEFL_DEFAULT	0
 #endif
@@ -143,5 +135,44 @@ static inline key_serial_t keyctl_join_session_keyring(const char *name) {
 #ifndef KEYCTL_SET_TIMEOUT
 # define KEYCTL_SET_TIMEOUT 15
 #endif
+
+#ifndef KEYCTL_INVALIDATE
+# define KEYCTL_INVALIDATE 21
+#endif
+
+/* key permissions */
+#ifndef KEY_POS_VIEW
+# define KEY_POS_VIEW    0x01000000
+# define KEY_POS_READ    0x02000000
+# define KEY_POS_WRITE   0x04000000
+# define KEY_POS_SEARCH  0x08000000
+# define KEY_POS_LINK    0x10000000
+# define KEY_POS_SETATTR 0x20000000
+# define KEY_POS_ALL     0x3f000000
+
+# define KEY_USR_VIEW    0x00010000
+# define KEY_USR_READ    0x00020000
+# define KEY_USR_WRITE   0x00040000
+# define KEY_USR_SEARCH  0x00080000
+# define KEY_USR_LINK    0x00100000
+# define KEY_USR_SETATTR 0x00200000
+# define KEY_USR_ALL     0x003f0000
+
+# define KEY_GRP_VIEW    0x00000100
+# define KEY_GRP_READ    0x00000200
+# define KEY_GRP_WRITE   0x00000400
+# define KEY_GRP_SEARCH  0x00000800
+# define KEY_GRP_LINK    0x00001000
+# define KEY_GRP_SETATTR 0x00002000
+# define KEY_GRP_ALL     0x00003f00
+
+# define KEY_OTH_VIEW    0x00000001
+# define KEY_OTH_READ    0x00000002
+# define KEY_OTH_WRITE   0x00000004
+# define KEY_OTH_SEARCH  0x00000008
+# define KEY_OTH_LINK    0x00000010
+# define KEY_OTH_SETATTR 0x00000020
+# define KEY_OTH_ALL     0x0000003f
+#endif /* !KEY_POS_VIEW */
 
 #endif	/* KEYCTL_H__ */

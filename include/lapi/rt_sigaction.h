@@ -1,29 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Copyright (c) 2009 Cisco Systems, Inc.  All Rights Reserved.
  * Copyright (c) 2009 FUJITSU LIMITED.  All Rights Reserved.
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it would be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- *
- * Further, this software is distributed without any warranty that it is
- * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
- * otherwise, applies only to this software file.  Patent licenses, if
- * any, provided herein do not apply to combinations of this program with
- * other software, or any other product whatsoever.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
- *
  * Author: Liu Bo <liubo2009@cn.fujitsu.com>
  * Author: Ngie Cooper <yaneurabeya@gmail.com>
- *
  */
 
 #ifndef LTP_RT_SIGACTION_H
@@ -36,12 +16,12 @@
 #if defined(__mips__)
 struct kernel_sigaction {
 	unsigned int sa_flags;
-	__sighandler_t k_sa_handler;
+	void (* k_sa_handler)(int);
 	sigset_t sa_mask;
 };
 #else
 struct kernel_sigaction {
-	__sighandler_t k_sa_handler;
+	void (* k_sa_handler)(int);
 	unsigned long sa_flags;
 	void (*sa_restorer) (void);
 	sigset_t sa_mask;
@@ -177,6 +157,12 @@ __attribute__ ((optimize("Os"))) __attribute__((used)) restore_rt(void)
 }
 #endif
 
+#ifdef TST_TEST_H__
+# define TST_SYSCALL tst_syscall
+#else
+# define TST_SYSCALL ltp_syscall
+#endif
+
 /* This is a wrapper for __NR_rt_sigaction syscall.
  * act/oact values of INVAL_SA_PTR is used to pass
  * an invalid pointer to syscall(__NR_rt_sigaction)
@@ -232,11 +218,11 @@ static int ltp_rt_sigaction(int signum, const struct sigaction *act,
 
 
 #ifdef __sparc__
-	ret = ltp_syscall(__NR_rt_sigaction, signum,
+	ret = TST_SYSCALL(__NR_rt_sigaction, signum,
 			kact_p, koact_p,
 			stub, sigsetsize);
 #else
-	ret = ltp_syscall(__NR_rt_sigaction, signum,
+	ret = TST_SYSCALL(__NR_rt_sigaction, signum,
 			kact_p, koact_p,
 			sigsetsize);
 #endif

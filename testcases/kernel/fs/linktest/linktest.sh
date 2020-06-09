@@ -1,79 +1,75 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright (c) International Business Machines Corp., 2000
+# Copyright (c) Linux Test Project, 2012-2019
+# Regression test for max links per file
+# Author: Ngie Cooper <yaneurabeya@gmail.com>
 
-#   Copyright (c) International Business Machines  Corp., 2000
-#
-#   This program is free software;  you can redistribute it and/or modify
-#   it under the terms of the GNU General Public License as published by
-#   the Free Software Foundation; either version 2 of the License, or
-#   (at your option) any later version.
-#
-#   This program is distributed in the hope that it will be useful,
-#   but WITHOUT ANY WARRANTY;  without even the implied warranty of
-#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See
-#   the GNU General Public License for more details.
-#
-#   You should have received a copy of the GNU General Public License
-#   along with this program;  if not, write to the Free Software
-#   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+TST_NEEDS_TMPDIR=1
+TST_TESTFUNC=do_test
+TST_OPTS="a:s:"
+TST_PARSE_ARGS=parse_args
+TST_USAGE=usage
 
+. tst_test.sh
 
-#
-#  FILE(s)     : linktest.sh README
-#  DESCRIPTION : Regression test for max links per file
-#  USE         : linktest.sh <number of symlinks> <number of hardlinks>
-#  AUTHOR      : Ngie Cooper (yaneurabeya@gmail.com)
-#  HISTORY     :
-#	A rewrite of testcases/kernel/fs/linktest.pl
+hard_links=1000
+soft_links=1000
 
-export TCID=linker01
-export TST_TOTAL=2
-export TST_COUNT=1
-. test.sh
+usage()
+{
+	echo "Usage: linktest.sh {-a n} {-s n}"
+	echo "-a n    Hard link count"
+	echo "-s n    Soft link count"
+}
 
-if [ $# -ne 2 ]; then
-	tst_resm TBROK "usage: $0 {softlink count} {hardlink count}"
-	exit 1
-fi
+parse_args()
+{
+	tst_is_int "$2" || tst_brk TBROK "-$1 must be integer ($2)"
+	[ "$2" -ge 0 ] || tst_brk TBROK "-$1 must be >= 0 ($2)"
 
-tst_tmpdir
+	case $1 in
+	a) hard_links=$2;;
+	s) soft_links=$2;;
+	esac
+}
 
-mkdir hlink.$$ slink.$$ && touch hlink.$$/hfile slink.$$/sfile
+do_link()
+{
+	local prefix="$1"
+	local ln_opts="$2"
+	local limit="$3"
+	local prefix_msg="$4"
 
-do_link() {
-	pfix=$1
-	ln_opts=$2
-	limit=$3
-	prefix_msg=$4
+	local lerrors=0
+	local i=0
+	local rtype="TFAIL"
 
-	lerrors=0
+	tst_res TINFO "test $prefix_msg link, limit: $limit"
 
-	i=0
-
-	cd "${pfix}link.$$"
+	cd "${prefix}link.$$"
 	while [ $i -lt $limit ]; do
-		if ! ln ${ln_opts} "$PWD/${pfix}file" ${pfix}file${i}; then
-			: $(( lerrors += 1 ))
+		if ! ln $ln_opts "$PWD/${prefix}file" ${prefix}file${i}; then
+			lerrors=$((lerrors + 1))
 		fi
-		: $(( i+= 1 ))
+		i=$((i + 1))
 	done
 	cd ..
 
-	if [ $lerrors -eq 0 ]; then
-		RTYPE=TPASS
-	else
-		RTYPE=TFAIL
-	fi
+	[ $lerrors -eq 0 ] && rtype="TPASS"
 
-	tst_resm $RTYPE "$prefix_msg Link Errors: $lerrors"
-
-	: $(( TST_COUNT += 1 ))
-
+	tst_res $rtype "errors: $lerrors"
 }
 
-do_link s "-s" ${1} "Symbolic"
-do_link h   "" ${2} "Hard"
+do_test()
+{
+	mkdir hlink.$$ slink.$$
+	touch hlink.$$/hfile slink.$$/sfile
 
-rm -Rf hlink.$$ slink.$$
+	do_link "s" "-s" $soft_links "symbolic"
+	do_link "h"   "" $hard_links "hard"
 
-tst_rmdir
-tst_exit
+	rm -rf hlink.$$ slink.$$
+}
+
+tst_run

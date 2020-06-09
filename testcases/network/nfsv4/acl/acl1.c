@@ -48,7 +48,6 @@ int do_file_op(char *filename)
 	result = 0;
 	FILE *fptr;
 	char str[256] = "./";
-	fptr = malloc(sizeof(FILE));
 
 	uid = geteuid();
 	strcat(str, filename);
@@ -303,7 +302,7 @@ void test_acl_default(char *dir, acl_t acl)
 	char *cmd = malloc(256);
 
 	strcpy(cmd, "chmod 7777 ");
-	printf(cmd);
+	printf(cmd, NULL);
 	strcat(cmd, dir);
 	system(cmd);
 	acl2 = acl_get_file(path, ACL_TYPE_ACCESS);

@@ -1,20 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Copyright (c) 2017 Petr Vorel <pvorel@suse.cz>
  * Copyright (c) 1997-2015 Red Hat, Inc. All rights reserved.
  * Copyright (c) 2011-2013 Rich Felker, et al.
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <arpa/inet.h>
@@ -34,6 +22,7 @@
 #include "tst_test.h"
 
 #include "tst_net.h"
+#include "tst_private.h"
 
 #define BASE_IPV4_PREFIX 8
 #define BASE_IPV6_PREFIX 16
@@ -153,7 +142,7 @@ static int is_in_subnet_ipv6(const struct in6_addr *network,
  */
 static char *get_ipv4_netmask(unsigned int prefix)
 {
-	char buf[INET_ADDRSTRLEN + 1];
+	char buf[INET_ADDRSTRLEN];
 	struct in_addr mask = prefix2mask(prefix);
 
 	if (prefix > MAX_IPV4_PREFIX)
@@ -200,7 +189,7 @@ static char *get_ipv4_broadcast(struct in_addr ip, unsigned int prefix)
 {
 	struct in_addr mask = prefix2mask(prefix);
 	struct in_addr broadcast;
-	char buf[INET_ADDRSTRLEN + 1];
+	char buf[INET_ADDRSTRLEN];
 
 	memset(&broadcast, 0, sizeof(broadcast));
 	broadcast.s_addr = (ip.s_addr & mask.s_addr) | ~mask.s_addr;
@@ -220,7 +209,7 @@ static char *get_ipv4_net16_unused(const struct in_addr *ip,
 	unsigned int prefix)
 {
 	struct in_addr mask, network;
-	char buf[128], net_unused[128];
+	char buf[132], net_unused[128];
 
 	mask = prefix2mask(prefix);
 	network = calc_network(ip, &mask);
@@ -229,7 +218,7 @@ static char *get_ipv4_net16_unused(const struct in_addr *ip,
 			DEFAULT_IPV4_UNUSED_PART2);
 	sprintf(buf, "%s.0.0", net_unused);
 
-	get_in_addr(buf, &network);
+	tst_get_in_addr(buf, &network);
 
 	if (!is_in_subnet_ipv4(ip, &mask, &network))
 		return strdup(net_unused);
@@ -241,7 +230,7 @@ static char *get_ipv4_net16_unused(const struct in_addr *ip,
 		(rand() % 128) + (((ip->s_addr >> 8) & 0xff) < 128 ? 128 : 0));
 	sprintf(buf, "%s.0.0", net_unused);
 
-	get_in_addr(buf, &network);
+	tst_get_in_addr(buf, &network);
 
 	if (!is_in_subnet_ipv4(ip, &mask, &network))
 		return strdup(net_unused);
@@ -251,7 +240,7 @@ static char *get_ipv4_net16_unused(const struct in_addr *ip,
 			< 128 ? 128 : 0), DEFAULT_IPV4_UNUSED_PART2);
 	sprintf(buf, "%s.0.0", net_unused);
 
-	get_in_addr(buf, &network);
+	tst_get_in_addr(buf, &network);
 
 	if (!is_in_subnet_ipv4(ip, &mask, &network))
 		return strdup(net_unused);
@@ -274,7 +263,7 @@ static char *get_ipv6_net32_unused(const struct in6_addr *ip6,
 {
 	int i, j;
 	struct in6_addr mask, network;
-	char buf[128], net_unused[128];
+	char buf[130], net_unused[128];
 
 	memset(&mask, 0x0, sizeof(mask));
 
@@ -293,7 +282,7 @@ static char *get_ipv6_net32_unused(const struct in6_addr *ip6,
 			DEFAULT_IPV6_UNUSED_PART2);
 	sprintf(buf, "%s::", net_unused);
 
-	get_in6_addr(buf, &network);
+	tst_get_in6_addr(buf, &network);
 
 	if (!is_in_subnet_ipv6(ip6, &mask, &network))
 		return strdup(net_unused);
@@ -306,7 +295,7 @@ static char *get_ipv6_net32_unused(const struct in6_addr *ip6,
 			DEFAULT_IPV6_UNUSED_PART2);
 	sprintf(buf, "%s::", net_unused);
 
-	get_in6_addr(buf, &network);
+	tst_get_in6_addr(buf, &network);
 
 	if (!is_in_subnet_ipv6(ip6, &mask, &network))
 		return strdup(net_unused);
@@ -317,7 +306,7 @@ static char *get_ipv6_net32_unused(const struct in6_addr *ip6,
 			128 : 0), DEFAULT_IPV6_UNUSED_PART2);
 	sprintf(buf, "%s::", net_unused);
 
-	get_in6_addr(buf, &network);
+	tst_get_in6_addr(buf, &network);
 
 	if (!is_in_subnet_ipv6(ip6, &mask, &network))
 		return strdup(net_unused);
@@ -471,10 +460,12 @@ static void check_prefix_range(unsigned int prefix, int is_ipv6, int is_lhost)
 
 static char *get_ipv4_network(int ip, unsigned int prefix)
 {
-	char buf[INET_ADDRSTRLEN + 1];
+	char buf[INET_ADDRSTRLEN];
 	char *p_buf = buf;
 	unsigned char byte;
 	unsigned int i;
+
+	ip = htonl(ip);
 
 	if (prefix > MAX_IPV4_PREFIX)
 		return NULL;
@@ -482,17 +473,11 @@ static char *get_ipv4_network(int ip, unsigned int prefix)
 	if (prefix == MAX_IPV4_PREFIX)
 		return strdup("\0");
 
-	prefix &= 0x18;
+	prefix &= MAX_IPV4_PREFIX - 8;
 
-	for (i = 0; i < MAX_IPV4_PREFIX && (prefix == 0 || i < prefix);
-	     i += 8) {
-		if (i == 0) {
-			byte = ip & 0xff;
-			sprintf(p_buf, "%d", byte);
-		} else {
-			byte = (ip >> i) & 0xff;
-			sprintf(p_buf, ".%d", byte);
-		}
+	for (i = prefix; i > 0; i -= 8) {
+		byte = (ip >> i) & 0xff;
+		sprintf(p_buf, i < prefix ? ".%d" : "%d", byte);
 		p_buf += strlen(p_buf);
 	}
 
@@ -519,8 +504,8 @@ static void get_ipv4_info(const char *lip_str, const char *rip_str, int lprefix,
 	lprefix_round = round_down_prefix(lprefix, 0);
 	rprefix_round = round_down_prefix(rprefix, 0);
 
-	get_in_addr(lip_str, &lip);
-	get_in_addr(rip_str, &rip);
+	tst_get_in_addr(lip_str, &lip);
+	tst_get_in_addr(rip_str, &rip);
 
 	vars.ipv4_lbroadcast = get_ipv4_broadcast(lip, lprefix);
 	vars.ipv4_rbroadcast = get_ipv4_broadcast(rip, rprefix);
@@ -546,8 +531,8 @@ static void get_ipv6_info(const char *lip_str, const char *rip_str,
 	lprefix_round = round_down_prefix(lprefix, 1);
 	rprefix_round = round_down_prefix(rprefix, 1);
 
-	get_in6_addr(lip_str, &lip);
-	get_in6_addr(rip_str, &rip);
+	tst_get_in6_addr(lip_str, &lip);
+	tst_get_in6_addr(rip_str, &rip);
 
 	vars.ipv6_lnetmask = get_ipv6_netmask(lprefix);
 	vars.ipv6_rnetmask = get_ipv6_netmask(rprefix);
@@ -564,23 +549,23 @@ static void get_ipv6_info(const char *lip_str, const char *rip_str,
 static void print_vars(int is_ipv6)
 {
 	if (is_ipv6) {
-		print_svar("IPV6_LNETMASK", vars.ipv6_lnetmask);
-		print_svar_change("IPV6_RNETMASK", vars.ipv6_rnetmask);
-		print_svar("IPV6_LNETWORK", vars.ipv6_lnetwork);
-		print_svar("IPV6_RNETWORK", vars.ipv6_rnetwork);
-		print_svar("LHOST_IPV6_HOST", vars.lhost_ipv6_host);
-		print_svar("RHOST_IPV6_HOST", vars.rhost_ipv6_host);
-		print_svar("IPV6_NET32_UNUSED", vars.ipv6_net32_unused);
+		tst_print_svar("IPV6_LNETMASK", vars.ipv6_lnetmask);
+		tst_print_svar_change("IPV6_RNETMASK", vars.ipv6_rnetmask);
+		tst_print_svar("IPV6_LNETWORK", vars.ipv6_lnetwork);
+		tst_print_svar("IPV6_RNETWORK", vars.ipv6_rnetwork);
+		tst_print_svar("LHOST_IPV6_HOST", vars.lhost_ipv6_host);
+		tst_print_svar("RHOST_IPV6_HOST", vars.rhost_ipv6_host);
+		tst_print_svar("IPV6_NET32_UNUSED", vars.ipv6_net32_unused);
 	} else {
-		print_svar("IPV4_LBROADCAST", vars.ipv4_lbroadcast);
-		print_svar_change("IPV4_RBROADCAST", vars.ipv4_rbroadcast);
-		print_svar("IPV4_LNETMASK", vars.ipv4_lnetmask);
-		print_svar_change("IPV4_RNETMASK", vars.ipv4_rnetmask);
-		print_svar("IPV4_LNETWORK", vars.ipv4_lnetwork);
-		print_svar("IPV4_RNETWORK", vars.ipv4_rnetwork);
-		print_svar("LHOST_IPV4_HOST", vars.lhost_ipv4_host);
-		print_svar("RHOST_IPV4_HOST", vars.rhost_ipv4_host);
-		print_svar("IPV4_NET16_UNUSED", vars.ipv4_net16_unused);
+		tst_print_svar("IPV4_LBROADCAST", vars.ipv4_lbroadcast);
+		tst_print_svar_change("IPV4_RBROADCAST", vars.ipv4_rbroadcast);
+		tst_print_svar("IPV4_LNETMASK", vars.ipv4_lnetmask);
+		tst_print_svar_change("IPV4_RNETMASK", vars.ipv4_rnetmask);
+		tst_print_svar("IPV4_LNETWORK", vars.ipv4_lnetwork);
+		tst_print_svar("IPV4_RNETWORK", vars.ipv4_rnetwork);
+		tst_print_svar("LHOST_IPV4_HOST", vars.lhost_ipv4_host);
+		tst_print_svar("RHOST_IPV4_HOST", vars.rhost_ipv4_host);
+		tst_print_svar("IPV4_NET16_UNUSED", vars.ipv4_net16_unused);
 	}
 }
 
@@ -602,19 +587,19 @@ int main(int argc, char *argv[])
 	rip_str = argv[2];
 
 	is_ipv6 = !!strchr(lip_str, ':');
-	lprefix = get_prefix(lip_str, is_ipv6);
-	rprefix = get_prefix(rip_str, is_ipv6);
+	lprefix = tst_get_prefix(lip_str, is_ipv6);
+	rprefix = tst_get_prefix(rip_str, is_ipv6);
 
 	if (is_ipv6)
-		get_in6_addr(lip_str, &ip6);
+		tst_get_in6_addr(lip_str, &ip6);
 	else
-		get_in_addr(lip_str, &ip);
+		tst_get_in_addr(lip_str, &ip);
 
 	tmp = !!strchr(rip_str, ':');
 	if (tmp)
-		get_in6_addr(rip_str, &ip6);
+		tst_get_in6_addr(rip_str, &ip6);
 	else
-		get_in_addr(rip_str, &ip);
+		tst_get_in_addr(rip_str, &ip);
 
 	if (is_ipv6 != tmp)
 		tst_brk_comment("mixed IPv4 and IPv6 addresses ('%s', '%s')",

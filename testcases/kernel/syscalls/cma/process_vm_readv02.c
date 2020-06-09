@@ -29,7 +29,7 @@
 
 #include "test.h"
 #include "safe_macros.h"
-#include "process_vm.h"
+#include "lapi/syscalls.h"
 
 char *TCID = "process_vm_readv02";
 int TST_TOTAL = 1;
@@ -107,7 +107,7 @@ static void child_alloc(void)
 	/* passing addr of string "foo" via pipe */
 	SAFE_CLOSE(tst_exit, pipe_fd[0]);
 	snprintf(buf, BUFSIZ, "%p", foo);
-	SAFE_WRITE(tst_exit, 1, pipe_fd[1], buf, strlen(buf));
+	SAFE_WRITE(tst_exit, 1, pipe_fd[1], buf, strlen(buf) + 1);
 	SAFE_CLOSE(tst_exit, pipe_fd[1]);
 
 	/* wait until child_invoke is done reading from our VM */
@@ -134,7 +134,8 @@ static void child_invoke(void)
 	remote.iov_len = len;
 
 	tst_resm(TINFO, "child 1: reading string from same memory location.");
-	TEST(test_process_vm_readv(pids[0], &local, 1, &remote, 1, 0));
+	TEST(ltp_syscall(__NR_process_vm_readv, pids[0],
+			 &local, 1UL, &remote, 1UL, 0UL));
 	if (TEST_RETURN != len)
 		tst_brkm(TFAIL | TERRNO, tst_exit, "process_vm_readv");
 	if (strncmp(lp, tst_string, len) != 0)
@@ -148,10 +149,9 @@ static void setup(void)
 {
 	tst_require_root();
 
-#if !defined(__NR_process_vm_readv)
-	tst_brkm(TCONF, NULL, "process_vm_readv does not exist "
-		 "on your system");
-#endif
+	/* Just a sanity check of the existence of syscall */
+	ltp_syscall(__NR_process_vm_readv, getpid(), NULL, 0UL, NULL, 0UL, 0UL);
+
 	tst_tmpdir();
 	TST_CHECKPOINT_INIT(cleanup);
 

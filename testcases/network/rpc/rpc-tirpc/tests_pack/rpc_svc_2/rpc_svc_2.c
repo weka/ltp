@@ -26,8 +26,9 @@
 */
 
 #include <stdio.h>
-#include <rpc/rpc.h>
+#include <string.h>
 #include <utmp.h>
+#include "rpc.h"
 
 //Standard define
 #define VERSNUM 1

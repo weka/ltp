@@ -1,24 +1,6 @@
-#
-#    network/stress/ns-tools test suite Makefile.
-#
-#    Copyright (C) 2009, Cisco Systems Inc.
-#
-#    This program is free software; you can redistribute it and/or modify
-#    it under the terms of the GNU General Public License as published by
-#    the Free Software Foundation; either version 2 of the License, or
-#    (at your option) any later version.
-#
-#    This program is distributed in the hope that it will be useful,
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#    GNU General Public License for more details.
-#
-#    You should have received a copy of the GNU General Public License along
-#    with this program; if not, write to the Free Software Foundation, Inc.,
-#    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-#
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright (C) 2009, Cisco Systems Inc.
 # Ngie Cooper, July 2009
-#
 
 top_srcdir		?= ../../../..
 
@@ -29,10 +11,10 @@ INSTALL_TARGETS		:= check_envval get_ifname initialize_if set_ipv4addr \
 			   check_icmpv6_connectivity check_netem check_setkey \
 			   create_file find_portbundle killall_icmp_traffic \
 			   killall_tcp_traffic killall_udp_traffic output_ipsec_conf \
-			   ns-echoclient test_net_stress.sh
+			   ns-echoclient tst_net_stress.sh
 
 FILTER_OUT_MAKE_TARGETS	:= ns-common
 
 include $(top_srcdir)/include/mk/generic_leaf_target.mk
 
-$(MAKE_TARGETS): %: %.o ns-common.o
+$(MAKE_TARGETS): %: ns-common.o

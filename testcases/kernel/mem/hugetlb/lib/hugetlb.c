@@ -39,22 +39,7 @@
 #include <pwd.h>
 #include "hugetlb.h"
 
-static long orig_hugepages = -1;
-
-long save_nr_hugepages(void)
-{
-	check_hugepage();
-
-	orig_hugepages = get_sys_tune("nr_hugepages");
-
-	return orig_hugepages;
-}
-
-void restore_nr_hugepages(void)
-{
-	if (orig_hugepages != -1)
-		set_sys_tune("nr_hugepages", orig_hugepages, 0);
-}
+key_t shmkey;
 
 /*
  * getipckey() - generates and returns a message key used by the "get"

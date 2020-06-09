@@ -31,6 +31,7 @@
 #include <linux/loop.h>
 #include <stdint.h>
 #include <inttypes.h>
+#include "lapi/syscalls.h"
 #include "test.h"
 #include "safe_macros.h"
 
@@ -45,6 +46,7 @@
 
 static char dev_path[1024];
 static int device_acquired;
+static unsigned long prev_dev_sec_write;
 
 static const char *dev_variants[] = {
 	"/dev/loop%i",
@@ -52,25 +54,26 @@ static const char *dev_variants[] = {
 	"/dev/block/loop%i"
 };
 
-static int set_dev_path(int dev)
+static int set_dev_path(int dev, char *path, size_t path_len)
 {
 	unsigned int i;
 	struct stat st;
 
 	for (i = 0; i < ARRAY_SIZE(dev_variants); i++) {
-		snprintf(dev_path, sizeof(dev_path), dev_variants[i], dev);
+		snprintf(path, path_len, dev_variants[i], dev);
 
-		if (stat(dev_path, &st) == 0 && S_ISBLK(st.st_mode))
+		if (stat(path, &st) == 0 && S_ISBLK(st.st_mode))
 			return 1;
 	}
 
 	return 0;
 }
 
-static int find_free_loopdev(void)
+int tst_find_free_loopdev(char *path, size_t path_len)
 {
 	int ctl_fd, dev_fd, rc, i;
 	struct loop_info loopinfo;
+	char buf[1024];
 
 	/* since Linux 3.1 */
 	ctl_fd = open(LOOP_CONTROL_FILE, O_RDWR);
@@ -79,12 +82,14 @@ static int find_free_loopdev(void)
 		rc = ioctl(ctl_fd, LOOP_CTL_GET_FREE);
 		close(ctl_fd);
 		if (rc >= 0) {
-			set_dev_path(rc);
-			tst_resm(TINFO, "Found free device '%s'", dev_path);
-			return 0;
+			if (path)
+				set_dev_path(rc, path, path_len);
+			tst_resm(TINFO, "Found free device %d '%s'",
+				rc, path ?: "");
+			return rc;
 		}
 		tst_resm(TINFO, "Couldn't find free loop device");
-		return 1;
+		return -1;
 	}
 
 	switch (errno) {
@@ -105,22 +110,26 @@ static int find_free_loopdev(void)
 	 */
 	for (i = 0; i < 256; i++) {
 
-		if (!set_dev_path(i))
+		if (!set_dev_path(i, buf, sizeof(buf)))
 			continue;
 
-		dev_fd = open(dev_path, O_RDONLY);
+		dev_fd = open(buf, O_RDONLY);
 
 		if (dev_fd < 0)
 			continue;
 
 		if (ioctl(dev_fd, LOOP_GET_STATUS, &loopinfo) == 0) {
-			tst_resm(TINFO, "Device '%s' in use", dev_path);
+			tst_resm(TINFO, "Device '%s' in use", buf);
 		} else {
 			if (errno != ENXIO)
 				continue;
-			tst_resm(TINFO, "Found free device '%s'", dev_path);
+			tst_resm(TINFO, "Found free device '%s'", buf);
 			close(dev_fd);
-			return 0;
+			if (path != NULL) {
+				strncpy(path, buf, path_len);
+				path[path_len-1] = '\0';
+			}
+			return i;
 		}
 
 		close(dev_fd);
@@ -128,10 +137,10 @@ static int find_free_loopdev(void)
 
 	tst_resm(TINFO, "No free devices found");
 
-	return 1;
+	return -1;
 }
 
-static int attach_device(const char *dev, const char *file)
+int tst_attach_device(const char *dev, const char *file)
 {
 	int dev_fd, file_fd;
 	struct loop_info loopinfo;
@@ -177,7 +186,7 @@ static int attach_device(const char *dev, const char *file)
 	return 0;
 }
 
-static int detach_device(const char *dev)
+int tst_detach_device(const char *dev)
 {
 	int dev_fd, ret, i;
 
@@ -214,10 +223,33 @@ static int detach_device(const char *dev)
 	return 1;
 }
 
+int tst_dev_sync(int fd)
+{
+	return syscall(__NR_syncfs, fd);
+}
+
+const char *tst_acquire_loop_device(unsigned int size, const char *filename)
+{
+	unsigned int acq_dev_size = MAX(size, DEV_SIZE_MB);
+
+	if (tst_fill_file(filename, 0, 1024 * 1024, acq_dev_size)) {
+		tst_resm(TWARN | TERRNO, "Failed to create %s", filename);
+		return NULL;
+	}
+
+	if (tst_find_free_loopdev(dev_path, sizeof(dev_path)) == -1)
+		return NULL;
+
+	if (tst_attach_device(dev_path, filename))
+		return NULL;
+
+	return dev_path;
+}
+
 const char *tst_acquire_device__(unsigned int size)
 {
 	int fd;
-	char *dev;
+	const char *dev;
 	struct stat st;
 	unsigned int acq_dev_size;
 	uint64_t ltp_dev_size;
@@ -268,20 +300,12 @@ const char *tst_acquire_device__(unsigned int size)
 				ltp_dev_size, acq_dev_size);
 	}
 
-	if (tst_fill_file(DEV_FILE, 0, 1024, 1024 * acq_dev_size)) {
-		tst_resm(TWARN | TERRNO, "Failed to create " DEV_FILE);
-		return NULL;
-	}
+	dev = tst_acquire_loop_device(acq_dev_size, DEV_FILE);
 
-	if (find_free_loopdev())
-		return NULL;
+	if (dev)
+		device_acquired = 1;
 
-	if (attach_device(dev_path, DEV_FILE))
-		return NULL;
-
-	device_acquired = 1;
-
-	return dev_path;
+	return dev;
 }
 
 const char *tst_acquire_device_(void (cleanup_fn)(void), unsigned int size)
@@ -313,7 +337,7 @@ int tst_release_device(const char *dev)
 {
 	int ret;
 
-	if (getenv("LTP_DEV"))
+	if (!device_acquired)
 		return 0;
 
 	/*
@@ -321,7 +345,7 @@ int tst_release_device(const char *dev)
 	 *
 	 * The file image is deleted in tst_rmdir();
 	 */
-	ret = detach_device(dev);
+	ret = tst_detach_device(dev);
 
 	device_acquired = 0;
 
@@ -349,10 +373,17 @@ int tst_umount(const char *path)
 		if (!ret)
 			return 0;
 
+		if (err != EBUSY) {
+			tst_resm(TWARN, "umount('%s') failed with %s",
+		         path, tst_strerrno(err));
+			errno = err;
+			return ret;
+		}
+
 		tst_resm(TINFO, "umount('%s') failed with %s, try %2i...",
 		         path, tst_strerrno(err), i+1);
 
-		if (i == 0 && err == EBUSY) {
+		if (i == 0) {
 			tst_resm(TINFO, "Likely gvfsd-trash is probing newly "
 			         "mounted fs, kill it to speed up tests.");
 		}
@@ -363,4 +394,97 @@ int tst_umount(const char *path)
 	tst_resm(TWARN, "Failed to umount('%s') after 50 retries", path);
 	errno = err;
 	return -1;
+}
+
+int tst_is_mounted(const char *path)
+{
+	char line[PATH_MAX];
+	FILE *file;
+	int ret = 0;
+
+	file = SAFE_FOPEN(NULL, "/proc/mounts", "r");
+
+	while (fgets(line, sizeof(line), file)) {
+		if (strstr(line, path) != NULL) {
+			ret = 1;
+			break;
+		}
+	}
+
+	SAFE_FCLOSE(NULL, file);
+
+	if (!ret)
+		tst_resm(TINFO, "No device is mounted at %s", path);
+
+	return ret;
+}
+
+int tst_is_mounted_at_tmpdir(const char *path)
+{
+	char cdir[PATH_MAX], mpath[PATH_MAX];
+	int ret;
+
+	if (!getcwd(cdir, PATH_MAX)) {
+		tst_resm(TWARN | TERRNO, "Failed to find current directory");
+		return 0;
+	}
+
+	ret = snprintf(mpath, PATH_MAX, "%s/%s", cdir, path);
+	if (ret < 0 || ret >= PATH_MAX) {
+		tst_resm(TWARN | TERRNO,
+			 "snprintf() should have returned %d instead of %d",
+			 PATH_MAX, ret);
+		return 0;
+	}
+
+	return tst_is_mounted(mpath);
+}
+
+int find_stat_file(const char *dev, char *path, size_t path_len)
+{
+	const char *devname = strrchr(dev, '/') + 1;
+
+	snprintf(path, path_len, "/sys/block/%s/stat", devname);
+
+	if (!access(path, F_OK))
+		return 1;
+
+	DIR *dir = SAFE_OPENDIR(NULL, "/sys/block/");
+	struct dirent *ent;
+
+	while ((ent = readdir(dir))) {
+		snprintf(path, path_len, "/sys/block/%s/%s/stat", ent->d_name, devname);
+
+		if (!access(path, F_OK)) {
+			SAFE_CLOSEDIR(NULL, dir);
+			return 1;
+		}
+	}
+
+	SAFE_CLOSEDIR(NULL, dir);
+	return 0;
+}
+
+unsigned long tst_dev_bytes_written(const char *dev)
+{
+	unsigned long dev_sec_write = 0, dev_bytes_written, io_ticks = 0;
+	char dev_stat_path[1024];
+
+	if (!find_stat_file(dev, dev_stat_path, sizeof(dev_stat_path)))
+		tst_brkm(TCONF, NULL, "Test device stat file: %s not found",
+			 dev_stat_path);
+
+	SAFE_FILE_SCANF(NULL, dev_stat_path,
+			"%*s %*s %*s %*s %*s %*s %lu %*s %*s %lu",
+			&dev_sec_write, &io_ticks);
+
+	if (!io_ticks)
+		tst_brkm(TCONF, NULL, "Test device stat file: %s broken",
+			 dev_stat_path);
+
+	dev_bytes_written = (dev_sec_write - prev_dev_sec_write) * 512;
+
+	prev_dev_sec_write = dev_sec_write;
+
+	return dev_bytes_written;
 }

@@ -1,21 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Copyright (c) 2016 Cyril Hrubis <chrubis@suse.cz>
  * Copyright (c) 2013 Stanislav Kholmanskikh <stanislav.kholmanskikh@oracle.com>
  * Copyright (c) 2010 Ngie Cooper <yaneurabeya@gmail.com>
  * Copyright (c) 2008 Mike Frysinger <vapier@gmail.com>
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #ifndef TST_COMMON_H__
@@ -34,5 +22,65 @@
  */
 #define LTP_ALIGN(x, a)    __LTP_ALIGN_MASK(x, (typeof(x))(a) - 1)
 #define __LTP_ALIGN_MASK(x, mask)  (((x) + (mask)) & ~(mask))
+
+/**
+ * TST_RETRY_FUNC() - Repeatedly retry a function with an increasing delay.
+ * @FUNC - The function which will be retried
+ * @ECHCK - Function/macro for validating @FUNC return value
+ *
+ * This macro will call @FUNC in a loop with a delay between retries.
+ * If ECHCK(ret) evaluates to non-zero, the loop ends. The delay between
+ * retries starts at one microsecond and is then doubled each iteration until
+ * it exceeds one second (the total time sleeping will be approximately one
+ * second as well). When the delay exceeds one second, the loop will end.
+ * The TST_RETRY_FUNC() macro returns the last value returned by @FUNC.
+ */
+#define TST_RETRY_FUNC(FUNC, ECHCK) \
+	TST_RETRY_FN_EXP_BACKOFF(FUNC, ECHCK, 1)
+
+#define TST_RETRY_FN_EXP_BACKOFF(FUNC, ECHCK, MAX_DELAY)	\
+({	unsigned int tst_delay_, tst_max_delay_;			\
+	typeof(FUNC) tst_ret_;						\
+	tst_delay_ = 1;							\
+	tst_max_delay_ = tst_multiply_timeout(MAX_DELAY * 1000000);	\
+	for (;;) {							\
+		errno = 0;						\
+		tst_ret_ = FUNC;					\
+		if (ECHCK(tst_ret_))					\
+			break;						\
+		if (tst_delay_ < tst_max_delay_) {			\
+			usleep(tst_delay_);				\
+			tst_delay_ *= 2;				\
+		} else {						\
+			break;						\
+		}							\
+	}								\
+	tst_ret_;							\
+})
+
+/*
+ * Return value validation macros for TST_RETRY_FUNC():
+ * TST_RETVAL_EQ0() - Check that value is equal to zero
+ */
+#define TST_RETVAL_EQ0(x) (!(x))
+
+/*
+ * TST_RETVAL_NOTNULL() - Check that value is not equal to zero/NULL
+ */
+#define TST_RETVAL_NOTNULL(x) (!!(x))
+
+/*
+ * TST_RETVAL_GE0() - Check that value is greater than or equal to zero
+ */
+#define TST_RETVAL_GE0(x) ((x) >= 0)
+
+#define TST_BUILD_BUG_ON(condition) \
+	do { ((void)sizeof(char[1 - 2 * !!(condition)])); } while (0)
+
+#define TST_BRK_SUPPORTS_ONLY_TCONF_TBROK(condition) \
+	TST_BUILD_BUG_ON(condition)
+
+#define TST_RES_SUPPORTS_TCONF_TFAIL_TINFO_TPASS_TWARN(condition) \
+	TST_BUILD_BUG_ON(condition)
 
 #endif /* TST_COMMON_H__ */

@@ -28,11 +28,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <rpc/rpc.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/socketvar.h>
 #include <utmp.h>
+#include "rpc.h"
 
 //Standard define
 #define PROCNUM 1

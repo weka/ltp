@@ -53,8 +53,8 @@
 #define MAP_COUNT_DEFAULT	1024
 #define MAX_MAP_COUNT		65536L
 
-static long old_max_map_count;
-static long old_overcommit;
+static long old_max_map_count = -1;
+static long old_overcommit = -1;
 static struct utsname un;
 
 static void setup(void)
@@ -65,7 +65,7 @@ static void setup(void)
 
 	old_max_map_count = get_sys_tune("max_map_count");
 	old_overcommit = get_sys_tune("overcommit_memory");
-	set_sys_tune("overcommit_memory", 2, 1);
+	set_sys_tune("overcommit_memory", 0, 1);
 
 	if (uname(&un) != 0)
 		tst_brk(TBROK | TERRNO, "uname error");
@@ -73,8 +73,10 @@ static void setup(void)
 
 static void cleanup(void)
 {
-	set_sys_tune("overcommit_memory", old_overcommit, 0);
-	set_sys_tune("max_map_count", old_max_map_count, 0);
+	if (old_overcommit != -1)
+		set_sys_tune("overcommit_memory", old_overcommit, 0);
+	if (old_max_map_count != -1)
+		set_sys_tune("max_map_count", old_max_map_count, 0);
 }
 
 /* This is a filter to exclude map entries which aren't accounted
@@ -152,13 +154,8 @@ static void max_map_count_test(void)
 	 * 1) use a safe maximum max_map_count value as upper-bound,
 	 *    we set it 65536 in this case, i.e., we don't test too big
 	 *    value;
-	 * 2) make sure total mapping isn't larger tha
+	 * 2) make sure total mapping isn't larger than
 	 *        CommitLimit - Committed_AS
-	 *    and set overcommit_memory to 2, this could help mapping
-	 *    returns ENOMEM instead of triggering oom-killer when
-	 *    memory is tight. (When there are enough free memory,
-	 *    step 1) will be used first.
-	 * Hope OOM-killer can be more stable oneday.
 	 */
 	memfree = SAFE_READ_MEMINFO("CommitLimit:") - SAFE_READ_MEMINFO("Committed_AS:");
 	/* 64 used as a bias to make sure no overflow happen */

@@ -1,18 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Copyright (c) 2015-2016 Cyril Hrubis <chrubis@suse.cz>
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * Copyright (c) Linux Test Project, 2016-2019
  */
 
 #ifndef TST_TEST_H__
@@ -24,6 +13,8 @@
 
 #include <unistd.h>
 #include <limits.h>
+#include <string.h>
+#include <errno.h>
 
 #include "tst_common.h"
 #include "tst_res_flags.h"
@@ -40,6 +31,14 @@
 #include "tst_clone.h"
 #include "tst_kernel.h"
 #include "tst_minmax.h"
+#include "tst_get_bad_addr.h"
+#include "tst_path_has_mnt_flags.h"
+#include "tst_sys_conf.h"
+#include "tst_coredump.h"
+#include "tst_buffers.h"
+#include "tst_capability.h"
+#include "tst_hugepage.h"
+#include "tst_assert.h"
 
 /*
  * Reports testcase result.
@@ -49,7 +48,11 @@ void tst_res_(const char *file, const int lineno, int ttype,
               __attribute__ ((format (printf, 4, 5)));
 
 #define tst_res(ttype, arg_fmt, ...) \
-	tst_res_(__FILE__, __LINE__, (ttype), (arg_fmt), ##__VA_ARGS__)
+	({									\
+		TST_RES_SUPPORTS_TCONF_TFAIL_TINFO_TPASS_TWARN(!((TTYPE_RESULT(ttype) ?: TCONF) & \
+			(TCONF | TFAIL | TINFO | TPASS | TWARN))); 				\
+		tst_res_(__FILE__, __LINE__, (ttype), (arg_fmt), ##__VA_ARGS__);\
+	})
 
 void tst_resm_hexd_(const char *file, const int lineno, int ttype,
 	const void *buf, size_t size, const char *arg_fmt, ...)
@@ -66,8 +69,15 @@ void tst_brk_(const char *file, const int lineno, int ttype,
               const char *fmt, ...)
               __attribute__ ((format (printf, 4, 5)));
 
-#define tst_brk(ttype, arg_fmt, ...) \
-	tst_brk_(__FILE__, __LINE__, (ttype), (arg_fmt), ##__VA_ARGS__)
+#define tst_brk(ttype, arg_fmt, ...)						\
+	({									\
+		TST_BRK_SUPPORTS_ONLY_TCONF_TBROK(!((ttype) &			\
+			(TBROK | TCONF | TFAIL))); 				\
+		tst_brk_(__FILE__, __LINE__, (ttype), (arg_fmt), ##__VA_ARGS__);\
+	})
+
+/* flush stderr and stdout */
+void tst_flush(void);
 
 pid_t safe_fork(const char *filename, unsigned int lineno);
 #define SAFE_FORK() \
@@ -104,6 +114,13 @@ int tst_parse_int(const char *str, int *val, int min, int max);
 int tst_parse_long(const char *str, long *val, long min, long max);
 int tst_parse_float(const char *str, float *val, float min, float max);
 
+struct tst_tag {
+	const char *name;
+	const char *value;
+};
+
+extern unsigned int tst_variant;
+
 struct tst_test {
 	/* number of tests available in test() function */
 	unsigned int tcnt;
@@ -120,9 +137,13 @@ struct tst_test {
 	int forks_child:1;
 	int needs_device:1;
 	int needs_checkpoints:1;
+	int needs_overlay:1;
 	int format_device:1;
 	int mount_device:1;
 	int needs_rofs:1;
+	int child_needs_reinit:1;
+	int needs_devfs:1;
+	int restore_wallclock:1;
 	/*
 	 * If set the test function will be executed for all available
 	 * filesystems and the current filesytem type would be set in the
@@ -133,15 +154,39 @@ struct tst_test {
 	 */
 	int all_filesystems:1;
 
+	/*
+	 * If set non-zero number of request_hugepages, test will try to reserve the
+	 * expected number of hugepage for testing in setup phase. If system does not
+	 * have enough hpage for using, it will try the best to reserve 80% available
+	 * number of hpages. With success test stores the reserved hugepage number in
+	 * 'tst_hugepages. For the system without hugetlb supporting, variable
+	 * 'tst_hugepages' will be set to 0.
+	 *
+	 * Also, we do cleanup and restore work for the hpages resetting automatically.
+	 */
+	unsigned long request_hugepages;
+
+	/*
+	 * If set non-zero denotes number of test variant, the test is executed
+	 * variants times each time with tst_variant set to different number.
+	 *
+	 * This allows us to run the same test for different settings. The
+	 * intended use is to test different syscall wrappers/variants but the
+	 * API is generic and does not limit the usage in any way.
+	 */
+	unsigned int test_variants;
+
 	/* Minimal device size in megabytes */
 	unsigned int dev_min_size;
 
 	/* Device filesystem type override NULL == default */
 	const char *dev_fs_type;
+	/* Flags to be passed to tst_get_supported_fs_types() */
+	int dev_fs_flags;
 
 	/* Options passed to SAFE_MKFS() when format_device is set */
 	const char *const *dev_fs_opts;
-	const char *dev_extra_opt;
+	const char *const *dev_extra_opts;
 
 	/* Device mount options, used if mount_device is set */
 	const char *mntpoint;
@@ -165,6 +210,39 @@ struct tst_test {
 
 	/* NULL terminated array of resource file names */
 	const char *const *resource_files;
+
+	/* NULL terminated array of needed kernel drivers */
+	const char * const *needs_drivers;
+
+	/*
+	 * NULL terminated array of (/proc, /sys) files to save
+	 * before setup and restore after cleanup
+	 */
+	const char * const *save_restore;
+
+	/*
+	 * NULL terminated array of kernel config options required for the
+	 * test.
+	 */
+	const char *const *needs_kconfigs;
+
+	/*
+	 * NULL-terminated array to be allocated buffers.
+	 */
+	struct tst_buffers *bufs;
+
+	/*
+	 * NULL-terminated array of capability settings
+	 */
+	struct tst_cap *caps;
+
+	/*
+	 * {NULL, NULL} terminated array of tags.
+	 */
+	const struct tst_tag *tags;
+
+	/* NULL terminated array of required commands */
+	const char *const *needs_cmds;
 };
 
 /*
@@ -184,12 +262,28 @@ void tst_reinit(void);
 #define TEST(SCALL) \
 	do { \
 		errno = 0; \
-		TEST_RETURN = SCALL; \
-		TEST_ERRNO = errno; \
+		TST_RET = SCALL; \
+		TST_ERR = errno; \
 	} while (0)
 
-extern long TEST_RETURN;
-extern int TEST_ERRNO;
+#define TEST_VOID(SCALL) \
+	do { \
+		errno = 0; \
+		SCALL; \
+		TST_ERR = errno; \
+	} while (0)
+
+extern long TST_RET;
+extern int TST_ERR;
+
+extern void *TST_RET_PTR;
+
+#define TESTPTR(SCALL) \
+	do { \
+		errno = 0; \
+		TST_RET_PTR = (void*)SCALL; \
+		TST_ERR = errno; \
+	} while (0)
 
 /*
  * Functions to convert ERRNO to its name and SIGNAL to its name.
@@ -203,7 +297,15 @@ const char *tst_strsig(int sig);
  */
 const char *tst_strstatus(int status);
 
+unsigned int tst_timeout_remaining(void);
+unsigned int tst_multiply_timeout(unsigned int timeout);
 void tst_set_timeout(int timeout);
+
+
+/*
+ * Returns path to the test temporary directory in a newly allocated buffer.
+ */
+char *tst_get_tmpdir(void);
 
 #ifndef TST_NO_DEFAULT_MAIN
 
@@ -218,9 +320,5 @@ int main(int argc, char *argv[])
 
 #define TST_TEST_TCONF(message)                                 \
         static struct tst_test test = { .tconf_msg = message  } \
-/*
- * This is a hack to make the testcases link without defining TCID
- */
-const char *TCID;
 
 #endif	/* TST_TEST_H__ */

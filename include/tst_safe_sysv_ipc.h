@@ -1,18 +1,5 @@
-/*
+/* SPDX-License-Identifier: GPL-2.0-or-later
  * Copyright (c) 2017 Xiao yang <yangx.jy@cn.fujitsu.com>
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #ifndef TST_SAFE_SYSV_IPC_H__
@@ -39,10 +26,10 @@ ssize_t safe_msgrcv(const char *file, const int lineno, int msqid, void *msgp,
 
 int safe_msgctl(const char *file, const int lineno, int msqid, int cmd,
 		struct msqid_ds *buf);
-#define SAFE_MSGCTL(msqid, cmd, buf) do { \
-	safe_msgctl(__FILE__, __LINE__, (msqid), (cmd), (buf)); \
+#define SAFE_MSGCTL(msqid, cmd, buf) ({ \
+	int tst_ret_ = safe_msgctl(__FILE__, __LINE__, (msqid), (cmd), (buf)); \
 	(msqid) = ((cmd) == IPC_RMID ? -1 : (msqid)); \
-	} while (0)
+	tst_ret_;})
 
 int safe_shmget(const char *file, const int lineno, key_t key, size_t size,
 		int shmflg);
@@ -59,9 +46,9 @@ int safe_shmdt(const char *file, const int lineno, const void *shmaddr);
 
 int safe_shmctl(const char *file, const int lineno, int shmid, int cmd,
 		struct shmid_ds *buf);
-#define SAFE_SHMCTL(shmid, cmd, buf) do { \
-	safe_shmctl(__FILE__, __LINE__, (shmid), (cmd), (buf)); \
+#define SAFE_SHMCTL(shmid, cmd, buf) ({ \
+	int tst_ret_ = safe_shmctl(__FILE__, __LINE__, (shmid), (cmd), (buf)); \
 	(shmid) = ((cmd) == IPC_RMID ? -1 : (shmid)); \
-	} while (0)
+	tst_ret_;})
 
 #endif /* TST_SAFE_SYSV_IPC_H__ */

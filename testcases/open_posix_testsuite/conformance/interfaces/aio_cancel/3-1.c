@@ -27,7 +27,6 @@
  *
  */
 
-#define _XOPEN_SOURCE 600
 #include <stdio.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -38,6 +37,7 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <aio.h>
+#include <time.h>
 
 #include "posixtest.h"
 
@@ -49,7 +49,8 @@
 static volatile int countdown = BUF_NB;
 static volatile int canceled;
 
-void sig_handler(int signum, siginfo_t *info, void *context)
+void sig_handler(int signum LTP_ATTRIBUTE_UNUSED, siginfo_t *info,
+    void *context LTP_ATTRIBUTE_UNUSED)
 {
 	struct aiocb *a = info->si_value.sival_ptr;
 
@@ -65,8 +66,10 @@ int main(void)
 {
 	char tmpfname[256];
 	int fd;
+	struct aiocb *aiocb_list[BUF_NB];
 	struct aiocb *aiocb;
 	struct sigaction action;
+	struct timespec processing_completion_ts = {0, 10000000};
 	int i;
 
 	if (sysconf(_SC_ASYNCHRONOUS_IO) < 200112L) {
@@ -121,7 +124,11 @@ int main(void)
 		aiocb->aio_sigevent.sigev_value.sival_ptr = aiocb;
 		aiocb->aio_reqprio = 0;
 
-		if (aio_write(aiocb) == -1) {
+		aiocb_list[i] = aiocb;
+	}
+
+	for (i = 0; i < BUF_NB; i++) {
+		if (aio_write(aiocb_list[i]) == -1) {
 			printf(TNAME " loop %d: Error at aio_write(): %s\n",
 			       i, strerror(errno));
 			return PTS_FAIL;
@@ -140,7 +147,7 @@ int main(void)
 	close(fd);
 
 	while (countdown)
-		usleep(10000);
+		nanosleep(&processing_completion_ts, NULL);
 
 	if (!canceled)
 		return PTS_UNRESOLVED;

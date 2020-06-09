@@ -55,6 +55,7 @@
 
 long TEST_RETURN;
 int TEST_ERRNO;
+void *TST_RET_PTR;
 
 #define VERBOSE      1
 #define NOPASS       3
@@ -81,8 +82,14 @@ int TEST_ERRNO;
 	assert(strlen(buf) > 0);		\
 } while (0)
 
-#if defined(__ANDROID__) && !defined(PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP)
-#define PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
+#ifndef PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP
+# ifdef __ANDROID__
+#  define PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP \
+	PTHREAD_RECURSIVE_MUTEX_INITIALIZER
+# else
+/* MUSL: http://www.openwall.com/lists/musl/2017/02/20/5 */
+#  define PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP  { {PTHREAD_MUTEX_RECURSIVE} }
+# endif
 #endif
 
 static pthread_mutex_t tmutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
@@ -239,7 +246,7 @@ static void tst_condense(int tnum, int ttype, const char *tmesg)
 	Buffered = TRUE;
 }
 
-void tst_flush(void)
+void tst_old_flush(void)
 {
 	NO_NEWLIB_ASSERT("Unknown", 0);
 
@@ -340,10 +347,10 @@ static void tst_print(const char *tcid, int tnum, int ttype, const char *tmesg)
 	}
 
 	if (ttype & TRERRNO) {
+		err = TEST_RETURN < 0 ? -(int)TEST_RETURN : (int)TEST_RETURN;
 		size += snprintf(message + size, sizeof(message) - size,
 				 ": TEST_RETURN=%s(%i): %s",
-				 tst_strerrno(TEST_RETURN), (int)TEST_RETURN,
-				 strerror(TEST_RETURN));
+				 tst_strerrno(err), err, strerror(err));
 	}
 
 	if (size + 1 >= sizeof(message)) {
@@ -393,7 +400,7 @@ void tst_exit(void)
 
 	pthread_mutex_lock(&tmutex);
 
-	tst_flush();
+	tst_old_flush();
 
 	T_exitval &= ~TINFO;
 
@@ -409,7 +416,7 @@ pid_t tst_fork(void)
 
 	NO_NEWLIB_ASSERT("Unknown", 0);
 
-	tst_flush();
+	tst_old_flush();
 
 	child = fork();
 	if (child == 0)
@@ -454,7 +461,7 @@ pid_t tst_vfork(void)
 {
 	NO_NEWLIB_ASSERT("Unknown", 0);
 
-	tst_flush();
+	tst_old_flush();
 	return vfork();
 }
 

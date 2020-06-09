@@ -1,19 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Copyright (C) 2015-2017 Cyril Hrubis <chrubis@suse.cz>
- *
- * This program is free software;  you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY;  without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See
- * the GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program;  if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 /*
@@ -27,6 +14,8 @@
 
 #include "tst_timer_test.h"
 
+#include "select_var.h"
+
 static int fds[2];
 
 static int sample_fn(int clk_id, long long usec)
@@ -39,12 +28,12 @@ static int sample_fn(int clk_id, long long usec)
 	FD_SET(fds[0], &sfds);
 
 	tst_timer_start(clk_id);
-	TEST(select(1, &sfds, NULL, NULL, &timeout));
+	TEST(do_select(1, &sfds, NULL, NULL, &timeout));
 	tst_timer_stop();
 	tst_timer_sample();
 
-	if (TEST_RETURN != 0) {
-		tst_res(TFAIL | TTERRNO, "select() returned %li", TEST_RETURN);
+	if (TST_RET != 0) {
+		tst_res(TFAIL | TTERRNO, "select() returned %li", TST_RET);
 		return 1;
 	}
 
@@ -53,6 +42,8 @@ static int sample_fn(int clk_id, long long usec)
 
 static void setup(void)
 {
+	select_info();
+
 	SAFE_PIPE(fds);
 }
 
@@ -69,5 +60,6 @@ static struct tst_test test = {
 	.scall = "select()",
 	.sample = sample_fn,
 	.setup = setup,
+	.test_variants = TEST_VARIANTS,
 	.cleanup = cleanup,
 };
